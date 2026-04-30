@@ -69,7 +69,7 @@ GCC_CONFIGURE_OPTS() {
     OPTS=(
         --prefix=${INSTALL_DIR}
         --target=riscv-none-elf
-        --enable-languages=c
+        --enable-languages=c,c++
         --disable-libssp
         --disable-libgomp
         --disable-libmudflap

@@ -1,0 +1,34 @@
+riscv-none-elf-gcc -march=rv64gc -mabi=lp64d -mcmodel=medany -static -nostdlib -nostartfiles -ffreestanding -fno-builtin -Wl,--no-relax -T /home/austin/Desktop/UM-Work/cva6-mojov/config/gen_from_riscv_config/linker/link.ld -o /home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf /home/austin/Desktop/UM-Work/cva6-mojov/verif/tests/custom/hello_mock_uart/hello_mock_uart.c
+
+make veri-testharness path_var=/home/austin/Desktop/UM-Work/cva6-mojov target=cv64a6_imafdc_sv39 elf=/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf log=/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.log variant=rv64gc priv=MSU tool_path=$RISCV/bin TRACE_FAST= TRACE_COMPACT=
+
+
+make clean
+make veri-testharness path_var="$CVA6_REPO_DIR" target="$TARGET" elf="$ELF" log="$CVA6_REPO_DIR/build/hello_mock_uart/hello_mock_uart.log" variant=rv64gc priv=MSU tool_path="$RISCV/bin" TRACE_FAST= TRACE_COMPACT=
+/home/austin/Desktop/UM-Work/cva6-mojov/work-ver/Variane_testharness   /home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf    ++/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf +elf_file=/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf +core_name=cv64a6_imafdc_sv39  +tohost_addr= +signature=/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.elf.signature_output +UVM_TESTNAME=uvmt_cva6_firmware_test_c +report_file=/home/austin/Desktop/UM-Work/cva6-mojov/build/hello_mock_uart/hello_mock_uart.log.yaml +core_name=cv64a6_imafdc_sv39
+
+
+
+CVA6_REPO_DIR=/home/austin/Desktop/UM-Work/cva6-mojov DV_SIMULATORS=veri-testharness,spike bash ./verif/regress/smoke-tests-cv64a6_imafdc_sv39.sh |& tee SMOKE64.log
+
+
+CVA6_REPO_DIR=/home/austin/Desktop/UM-Work/cva6-mojov DV_SIMULATORS=veri-testharness,spike bash ./verif/regress/coremark.sh DV_HWCONFIG_OPTS=cv64a6_imafdc_sv39 |& tee COREMARK64.log
+
+source .venv/bin/activate
+bash verif/regress/smoke-tests-cv32a6_imac_sv32.sh |& tee SMOKE32.log 
+bash verif/regress/smoke-tests-cv64a6_imafdc_sv39.sh |& tee SMOKE64.log 
+
+Run a test
+==========
+source .venv/bin/activate
+source ./verif/regress/install-spike.sh
+source ./verif/regress/install-riscv-compliance.sh
+source ./verif/regress/install-riscv-tests.sh
+source ./verif/regress/install-riscv-arch-test.sh
+source ./verif/sim/setup-env.sh
+export UVM_VERBOSITY=UVM_NONE
+export DV_OPTS="$DV_OPTS --issrun_opts=+debug_disable=1+UVM_VERBOSITY=$UVM_VERBOSITY"
+export CC_OPTS="-static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -g ../tests/custom/common/syscalls.c ../tests/custom/common/crt.S -I../tests/custom/env -I../tests/custom/common -lgcc"
+cd verif/sim
+python3 cva6.py --testlist=../tests/testlist_riscv-compliance-cv64a6_imafdc_sv39.yaml --test rv32i-I-ADD-01 --iss_yaml cva6.yaml --target cv64a6_imafdc_sv39 --iss=veri-testharness,spike --issrun_opts=+debug_disable=1+UVM_VERBOSITY=UVM_NONE
+

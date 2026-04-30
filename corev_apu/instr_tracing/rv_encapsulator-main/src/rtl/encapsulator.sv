@@ -36,10 +36,21 @@ module encapsulator (
 );
   // pragma translate_off
   int f;
+  bit rvfi_trace_en;
   initial begin
-    f = $fopen("encaps.traces", "w");
+    rvfi_trace_en = $test$plusargs("rvfi_trace");
+    if (rvfi_trace_en) begin
+      f = $fopen("encaps.traces", "w");
+    end else begin
+      f = 0;
+    end
   end
-  final $fclose(f);
+
+  final begin
+    if (rvfi_trace_en) begin
+      $fclose(f);
+    end
+  end
   // pragma translate_on
 
 always_comb begin
@@ -64,7 +75,7 @@ always_comb begin
 end
 // pragma translate_off
 always_ff @(posedge clk_i) begin
-    if (valid_o) begin
+    if (rvfi_trace_en && valid_o) begin
         $fwrite(
         f,
         "%h\n",encap_fifo_entry_o);

@@ -30,11 +30,22 @@ module cva6_iti #(
 
   // pragma translate_off
   int f;
+  bit rvfi_trace_en;
   initial begin
-    f = $fopen("iti.traces", "w");
-    $fwrite(f, "itype_0,cause,tval,priv,iaddr_0,context,ctype,iretire_0,ilastsize_0\n");
+    rvfi_trace_en = $test$plusargs("rvfi_trace");
+    if (rvfi_trace_en) begin
+      f = $fopen("iti.traces", "w");
+      $fwrite(f, "itype_0,cause,tval,priv,iaddr_0,context,ctype,iretire_0,ilastsize_0\n");
+    end else begin
+      f = 0;
+    end
   end
-  final $fclose(f);
+
+  final begin
+    if (rvfi_trace_en) begin
+      $fclose(f);
+    end
+  end
   // pragma translate_on
 
   /* Structure used for each instr*/
@@ -200,11 +211,13 @@ module cva6_iti #(
       end
     end
     //pragma translate_off
-    for (int i = 0; i < CVA6Cfg.NrCommitPorts; i++) begin
-      if (itt_out[i].valid) begin
-        $fwrite(f, "%d,%0d,%0d,%d,%h,0,0,%0d,%0d\n", itt_out[i].itype, itt_out[i].cause,
-                itt_out[i].tval, itt_out[i].priv, itt_out[i].iaddr, itt_out[i].iretire,
-                itt_out[i].ilastsize);
+    if (rvfi_trace_en) begin
+      for (int i = 0; i < CVA6Cfg.NrCommitPorts; i++) begin
+        if (itt_out[i].valid) begin
+          $fwrite(f, "%d,%0d,%0d,%d,%h,0,0,%0d,%0d\n", itt_out[i].itype, itt_out[i].cause,
+                  itt_out[i].tval, itt_out[i].priv, itt_out[i].iaddr, itt_out[i].iretire,
+                  itt_out[i].ilastsize);
+        end
       end
     end
     //pragma translate_on
