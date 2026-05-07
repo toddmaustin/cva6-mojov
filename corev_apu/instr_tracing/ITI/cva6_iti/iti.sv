@@ -32,7 +32,7 @@ module cva6_iti #(
   int f;
   bit rvfi_trace_en;
   initial begin
-    rvfi_trace_en = $test$plusargs("rvfi_trace");
+    rvfi_trace_en = !$test$plusargs("no_rvfi_trace");
     if (rvfi_trace_en) begin
       f = $fopen("iti.traces", "w");
       $fwrite(f, "itype_0,cause,tval,priv,iaddr_0,context,ctype,iretire_0,ilastsize_0\n");

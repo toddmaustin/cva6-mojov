@@ -42,13 +42,13 @@ module rvfi_tracer #(
   bit rvfi_trace_en; // generate trace?
   int unsigned SIM_FINISH;
   initial begin
-    rvfi_trace_en = $test$plusargs("rvfi_trace");
+    rvfi_trace_en = !$test$plusargs("no_rvfi_trace");
     if (rvfi_trace_en) begin
       f = $fopen($sformatf("trace_rvfi_hart_%h.dasm", HART_ID), "w");
-      $display("*** [rvfi_tracer] INFO: RVFI instruction trace enabled");
+      $display("*** [rvfi_tracer] INFO: RVFI instruction trace enabled; use +no_rvfi_trace to disable");
     end else begin
       f = 0;
-      $display("*** [rvfi_tracer] INFO: RVFI instruction trace disabled; use +rvfi_trace to enable");
+      $display("*** [rvfi_tracer] INFO: RVFI instruction trace disabled");
     end
 
     TOHOST_ADDR = '0;

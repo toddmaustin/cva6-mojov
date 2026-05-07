@@ -38,7 +38,7 @@ module encapsulator (
   int f;
   bit rvfi_trace_en;
   initial begin
-    rvfi_trace_en = $test$plusargs("rvfi_trace");
+    rvfi_trace_en = !$test$plusargs("no_rvfi_trace");
     if (rvfi_trace_en) begin
       f = $fopen("encaps.traces", "w");
     end else begin
