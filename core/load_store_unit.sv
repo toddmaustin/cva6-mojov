@@ -723,7 +723,7 @@ module load_store_unit
       if (CVA6Cfg.IS_XLEN64) begin
         case (lsu_ctrl.operation)
           // double word
-          LD, SD, FLD, FSD,
+          LD, LDE, SD, SDE, FLD, FLDE, FSD, FSDE,
                   AMO_LRD, AMO_SCD,
                   AMO_SWAPD, AMO_ADDD, AMO_ANDD, AMO_ORD,
                   AMO_XORD, AMO_MAXD, AMO_MAXDU, AMO_MIND,

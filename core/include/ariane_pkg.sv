@@ -317,7 +317,9 @@ package ariane_pkg;
     CSR_CLEAR,
     // LSU functions
     LD,
+    LDE,
     SD,
+    SDE,
     LW,
     LWU,
     SW,
@@ -386,10 +388,12 @@ package ariane_pkg;
     REMUW,
     // Floating-Point Load and Store Instructions
     FLD,
+    FLDE,
     FLW,
     FLH,
     FLB,
     FSD,
+    FSDE,
     FSW,
     FSH,
     FSB,
@@ -621,7 +625,7 @@ package ariane_pkg;
 
   function automatic logic fd_changes_rd_state(input fu_op op);
     unique case (op) inside
-      FSD, FSW, FSH, FSB,  // stores
+      FSD, FSDE, FSW, FSH, FSB,  // stores
       FCVT_F2I,  // conversion to int
       FMV_F2X,  // move as-is to int
       FCLASS:  // classification (writes output to integer register)
@@ -788,7 +792,7 @@ package ariane_pkg;
   // ----------------------
   function automatic logic [1:0] extract_transfer_size(fu_op op);
     case (op)
-      LD, HLV_D, SD, HSV_D, FLD, FSD,
+      LD, LDE, HLV_D, SD, SDE, HSV_D, FLD, FLDE, FSD, FSDE,
             AMO_LRD,   AMO_SCD,
             AMO_SWAPD, AMO_ADDD,
             AMO_ANDD,  AMO_ORD,
