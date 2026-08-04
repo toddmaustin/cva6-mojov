@@ -71,6 +71,7 @@ package build_config_pkg;
     cfg.ZKN = CVA6Cfg.ZKN;
     cfg.RVV = CVA6Cfg.RVV;
     cfg.RVC = CVA6Cfg.RVC;
+    cfg.MojoVEn = CVA6Cfg.MojoVEn;
     cfg.RVH = CVA6Cfg.RVH;
     cfg.RVZCB = CVA6Cfg.RVZCB;
     cfg.RVZCMT = CVA6Cfg.RVZCMT;
