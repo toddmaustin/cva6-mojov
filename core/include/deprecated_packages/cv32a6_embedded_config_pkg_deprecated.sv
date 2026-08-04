@@ -98,6 +98,7 @@ package cva6_config_pkg;
       ZKN: bit'(0),
       RVV: bit'(CVA6ConfigVExtEn),
       RVC: bit'(CVA6ConfigCExtEn),
+      MojoVEn: bit'(0),
       RVH: bit'(CVA6ConfigHExtEn),
       RVZCB: bit'(CVA6ConfigZcbExtEn),
       RVZCMP: bit'(CVA6ConfigZcmpExtEn),

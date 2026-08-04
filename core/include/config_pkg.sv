@@ -74,6 +74,8 @@ package config_pkg;
     bit                          RVV;
     // Compress RISC-V extension
     bit                          RVC;
+    // Mojo-V extension
+    bit                          MojoVEn;
     // Hypervisor RISC-V extension
     bit                          RVH;
     // Zcb RISC-V extension
@@ -307,6 +309,7 @@ package config_pkg;
     bit          ZKN;
     bit          RVV;
     bit          RVC;
+    bit          MojoVEn;
     bit          RVH;
     bit          RVZCB;
     bit          RVZCMP;
@@ -459,6 +462,8 @@ package config_pkg;
     assert (!(Cfg.RVS && !Cfg.SoftwareInterruptEn));
     assert (!(Cfg.RVH && !Cfg.SoftwareInterruptEn));
     assert (!(Cfg.RVZCMT && ~Cfg.MmuPresent));
+    assert (!Cfg.MojoVEn || (Cfg.XLEN == 64 && Cfg.RVF && Cfg.RVD))
+    else $fatal(1, "[config] MojoVEn requires XLEN == 64, RVF == 1, and RVD == 1");
     // pragma translate_on
   endfunction
 
