@@ -266,6 +266,28 @@ module csr_regfile
   logic [CVA6Cfg.XLEN-1:0] mtval_q, mtval_d;
   logic [CVA6Cfg.XLEN-1:0] mtinst_q, mtinst_d;
   logic [CVA6Cfg.XLEN-1:0] mtval2_q, mtval2_d;
+
+  typedef struct packed {
+    logic [CVA6Cfg.XLEN-1:12] reserved;
+    logic [7:0]               mojov_ver;
+    logic [1:0]               format_sel;
+    logic                     key_valid;
+    logic                     mojov_en;
+  } mojov_cfg_t;
+
+  mojov_cfg_t mojov_cfg_q, mojov_cfg_d;
+  logic [CVA6Cfg.XLEN-1:0] mojov_cfg_warl;
+
+  function automatic mojov_cfg_t warl_mojov_cfg(input logic [CVA6Cfg.XLEN-1:0] value);
+    mojov_cfg_t cfg;
+    cfg = '0;
+    cfg.mojov_en   = value[0];
+    cfg.key_valid  = 1'b1;
+    cfg.format_sel = value[3:2];
+    cfg.mojov_ver  = 8'h01;
+    return cfg;
+  endfunction
+
   logic fiom_d, fiom_q;
 
   logic [CVA6Cfg.XLEN-1:0] stvec_q, stvec_d;
@@ -341,6 +363,8 @@ module csr_regfile
 
   riscv::fcsr_t fcsr_q, fcsr_d;
   jvt_t jvt_q, jvt_d;
+
+  assign mojov_cfg_warl = {{CVA6Cfg.XLEN - 12{1'b0}}, mojov_cfg_q.mojov_ver, mojov_cfg_q.format_sel, mojov_cfg_q.key_valid, mojov_cfg_q.mojov_en};
   // ----------------
   // Assignments
   // ----------------
@@ -393,6 +417,13 @@ module csr_regfile
         riscv::CSR_FCSR: begin
           if (CVA6Cfg.FpPresent && !(mstatus_q.fs == riscv::Off || (CVA6Cfg.RVH && v_q && vsstatus_q.fs == riscv::Off))) begin
             csr_rdata = {{CVA6Cfg.XLEN - 8{1'b0}}, fcsr_q.frm, fcsr_q.fflags};
+          end else begin
+            read_access_exception = 1'b1;
+          end
+        end
+        riscv::CSR_MOJOV_CFG: begin
+          if (CVA6Cfg.MojoVEn) begin
+            csr_rdata = mojov_cfg_warl;
           end else begin
             read_access_exception = 1'b1;
           end
@@ -1012,6 +1043,7 @@ module csr_regfile
     if (CVA6Cfg.RVZCMT) begin
       jvt_d = jvt_q;
     end
+    mojov_cfg_d = mojov_cfg_q;
     fcsr_d       = fcsr_q;
 
     priv_lvl_d   = priv_lvl_q;
@@ -1144,6 +1176,20 @@ module csr_regfile
             fcsr_d[7:0] = csr_wdata[7:0];  // ignore writes to reserved space
             // this instruction has side-effects
             flush_o = 1'b1;
+          end else begin
+            update_access_exception = 1'b1;
+          end
+        end
+        riscv::CSR_MOJOV_CFG: begin
+          if (CVA6Cfg.MojoVEn) begin
+            automatic mojov_cfg_t mojov_cfg_next;
+            mojov_cfg_next = warl_mojov_cfg(csr_wdata);
+            if (mojov_cfg_next.mojov_en != mojov_cfg_q.mojov_en ||
+                mojov_cfg_next.format_sel != mojov_cfg_q.format_sel) begin
+              // Changes to runtime enable or encrypted memory format require serialization.
+              flush_o = 1'b1;
+            end
+            mojov_cfg_d = mojov_cfg_next;
           end else begin
             update_access_exception = 1'b1;
           end
@@ -2779,6 +2825,7 @@ module csr_regfile
       mcounteren_q     <= {CVA6Cfg.XLEN{1'b0}};
       mscratch_q       <= {CVA6Cfg.XLEN{1'b0}};
       if (CVA6Cfg.TvalEn) mtval_q <= {CVA6Cfg.XLEN{1'b0}};
+      mojov_cfg_q     <= warl_mojov_cfg('0);
       fiom_q          <= '0;
       dcache_q        <= {{CVA6Cfg.XLEN - 1{1'b0}}, 1'b1};
       icache_q        <= {{CVA6Cfg.XLEN - 1{1'b0}}, 1'b1};
@@ -2877,6 +2924,7 @@ module csr_regfile
       mcounteren_q     <= mcounteren_d;
       mscratch_q       <= mscratch_d;
       if (CVA6Cfg.TvalEn) mtval_q <= mtval_d;
+      mojov_cfg_q     <= mojov_cfg_d;
       fiom_q          <= fiom_d;
       dcache_q        <= dcache_d;
       icache_q        <= icache_d;
