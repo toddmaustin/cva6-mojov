@@ -1282,6 +1282,49 @@ module decoder
         // --------------------------------
         // LSU
         // --------------------------------
+        riscv::OpcodeCustom0: begin
+          unique casez (instruction_i)
+            // Mojo-V encrypted memory operations from MojoV-spec-1.02:
+            //   lde  imm[11:0] rs1 000 rd  0001011
+            //   sde  imm[11:5] rs2 rs1 001 imm[4:0] 0001011
+            //   flde imm[11:0] rs1 010 rd  0001011
+            //   fsde imm[11:5] rs2 rs1 011 imm[4:0] 0001011
+            32'b?????????????????000?????0001011: begin
+              instruction_o.fu  = LOAD;
+              imm_select        = IIMM;
+              instruction_o.rs1 = instr.itype.rs1;
+              instruction_o.rd  = instr.itype.rd;
+              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::LDE;
+              else illegal_instr = 1'b1;
+            end
+            32'b?????????????????001?????0001011: begin
+              instruction_o.fu  = STORE;
+              imm_select        = SIMM;
+              instruction_o.rs1 = instr.stype.rs1;
+              instruction_o.rs2 = instr.stype.rs2;
+              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::SDE;
+              else illegal_instr = 1'b1;
+            end
+            32'b?????????????????010?????0001011: begin
+              instruction_o.fu  = LOAD;
+              imm_select        = IIMM;
+              instruction_o.rs1 = instr.itype.rs1;
+              instruction_o.rd  = instr.itype.rd;
+              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::FLDE;
+              else illegal_instr = 1'b1;
+            end
+            32'b?????????????????011?????0001011: begin
+              instruction_o.fu  = STORE;
+              imm_select        = SIMM;
+              instruction_o.rs1 = instr.stype.rs1;
+              instruction_o.rs2 = instr.stype.rs2;
+              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::FSDE;
+              else illegal_instr = 1'b1;
+            end
+            default: illegal_instr = 1'b1;
+          endcase
+        end
+
         riscv::OpcodeStore: begin
           instruction_o.fu = STORE;
           imm_select = SIMM;
