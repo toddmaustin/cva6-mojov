@@ -395,6 +395,8 @@ package riscv;
     CSR_FCSR             = 12'h003,
     //jvt
     CSR_JVT              = 12'h017,
+    // Mojo-V CSRs
+    CSR_MOJOV_CFG        = 12'h0A0,
     CSR_FTRAN            = 12'h800,
     // Vector CSRs
     CSR_VSTART           = 12'h008,
