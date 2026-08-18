@@ -127,6 +127,10 @@ module issue_read_operands
     input logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_i,
     // FPR write enable - COMMIT_STAGE
     input logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_i,
+    // Zeroize Mojo-V GPR secret registers x24-x31 - COMMIT_STAGE
+    input logic mojov_gpr_zeroize_i,
+    // Zeroize Mojo-V FPR secret registers f24-f31 - COMMIT_STAGE
+    input logic mojov_fpr_zeroize_i,
     // Issue stall - PERF_COUNTERS
     output logic stall_issue_o,
     // Information dedicated to RVFI - RVFI
@@ -926,7 +930,8 @@ module issue_read_operands
         .rdata_o  (rdata),
         .waddr_i  (waddr_pack),
         .wdata_i  (wdata_pack),
-        .we_i     (we_pack)
+        .we_i     (we_pack),
+        .mojov_zeroize_i(mojov_gpr_zeroize_i)
     );
   end else begin : gen_asic_regfile
     ariane_regfile #(
@@ -942,7 +947,8 @@ module issue_read_operands
         .rdata_o  (rdata),
         .waddr_i  (waddr_pack),
         .wdata_i  (wdata_pack),
-        .we_i     (we_pack)
+        .we_i     (we_pack),
+        .mojov_zeroize_i(mojov_gpr_zeroize_i)
     );
   end
 
@@ -988,7 +994,8 @@ module issue_read_operands
             .rdata_o  (fprdata),
             .waddr_i  (waddr_pack),
             .wdata_i  (fp_wdata_pack),
-            .we_i     (we_fpr_i)
+            .we_i     (we_fpr_i),
+            .mojov_zeroize_i(mojov_fpr_zeroize_i)
         );
       end else begin : gen_asic_fp_regfile
         ariane_regfile #(
@@ -1004,7 +1011,8 @@ module issue_read_operands
             .rdata_o  (fprdata),
             .waddr_i  (waddr_pack),
             .wdata_i  (fp_wdata_pack),
-            .we_i     (we_fpr_i)
+            .we_i     (we_fpr_i),
+            .mojov_zeroize_i(mojov_fpr_zeroize_i)
         );
       end
     end else begin : no_fpr_gen

@@ -39,7 +39,9 @@ module ariane_regfile #(
     // write port
     input  logic [CVA6Cfg.NrCommitPorts-1:0][           4:0] waddr_i,
     input  logic [CVA6Cfg.NrCommitPorts-1:0][DATA_WIDTH-1:0] wdata_i,
-    input  logic [CVA6Cfg.NrCommitPorts-1:0]                 we_i
+    input  logic [CVA6Cfg.NrCommitPorts-1:0]                 we_i,
+    // Synchronously zero architectural secret registers x24-x31/f24-f31.
+    input  logic                                             mojov_zeroize_i
 );
 
   localparam ADDR_WIDTH = 5;
@@ -62,6 +64,13 @@ module ariane_regfile #(
   always_ff @(posedge clk_i, negedge rst_ni) begin : register_write_behavioral
     if (~rst_ni) begin
       mem <= '{default: '0};
+    end else if (mojov_zeroize_i) begin
+      for (int unsigned i = 24; i < 32; i++) begin
+        mem[i] <= '0;
+      end
+      if (ZERO_REG_ZERO) begin
+        mem[0] <= '0;
+      end
     end else begin
       for (int unsigned j = 0; j < CVA6Cfg.NrCommitPorts; j++) begin
         for (int unsigned i = 0; i < NUM_WORDS; i++) begin
@@ -78,6 +87,11 @@ module ariane_regfile #(
 
   for (genvar i = 0; i < NR_READ_PORTS; i++) begin
     assign rdata_o[i] = mem[raddr_i[i]];
+  end
+
+  for (genvar i = 24; i < 32; i++) begin : gen_mojov_zeroize_assert
+    assert property (@(posedge clk_i) disable iff (!rst_ni) mojov_zeroize_i |=> mem[i] == '0)
+    else $fatal(1, "[Mojo-V] Secret register was not zeroized");
   end
 
 endmodule
