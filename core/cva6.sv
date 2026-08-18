@@ -551,6 +551,9 @@ module cva6
   logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] wdata_commit_id;
   logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_commit_id;
   logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_commit_id;
+  logic mojov_gpr_zeroize_commit_id;
+  logic mojov_fpr_zeroize_commit_id;
+  logic mojov_en_csr_commit;
   // --------------
   // CSR <-> *
   // --------------
@@ -942,6 +945,8 @@ module cva6
       .wdata_i              (wdata_commit_id),
       .we_gpr_i             (we_gpr_commit_id),
       .we_fpr_i             (we_fpr_commit_id),
+      .mojov_gpr_zeroize_i (mojov_gpr_zeroize_commit_id),
+      .mojov_fpr_zeroize_i (mojov_fpr_zeroize_commit_id),
       .commit_instr_o       (commit_instr_id_commit),
       .commit_drop_o        (commit_drop_id_commit),
       .commit_ack_i         (commit_ack_commit_id),
@@ -1134,6 +1139,10 @@ module cva6
       .wdata_o             (wdata_commit_id),
       .we_gpr_o            (we_gpr_commit_id),
       .we_fpr_o            (we_fpr_commit_id),
+      .mojov_gpr_zeroize_o(mojov_gpr_zeroize_commit_id),
+      .mojov_fpr_zeroize_o(mojov_fpr_zeroize_commit_id),
+      .mojov_en_i          (mojov_en_csr_commit),
+      .csr_addr_i          (csr_addr_ex_csr),
       .amo_resp_i          (amo_resp),
       .pc_o                (pc_commit),
       .csr_op_o            (csr_op_commit_csr),
@@ -1157,6 +1166,11 @@ module cva6
   );
 
   assign commit_ack = commit_macro_ack & ~commit_drop_id_commit;
+
+  mojov_en_falls_after_zeroize :
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+      $fell(mojov_en_csr_commit) |-> $past(mojov_gpr_zeroize_commit_id && mojov_fpr_zeroize_commit_id))
+  else $fatal(1, "[Mojo-V] mojov_en fell before secret-register zeroization");
 
   // ---------
   // CSR
@@ -1187,6 +1201,7 @@ module cva6
       .dirty_fp_state_i        (dirty_fp_state),
       .csr_write_fflags_i      (csr_write_fflags_commit_cs),
       .dirty_v_state_i         (dirty_v_state),
+      .mojov_en_o             (mojov_en_csr_commit),
       .pc_i                    (pc_commit),
       .csr_exception_o         (csr_exception_csr_commit),
       .epc_o                   (epc_commit_pcgen),

@@ -60,6 +60,8 @@ module csr_regfile
     input logic csr_write_fflags_i,
     // Mark the V state as dirty - ACC_DISPATCHER
     input logic dirty_v_state_i,
+    // Mojo-V runtime enable value - COMMIT_STAGE
+    output logic mojov_en_o,
     // PC of instruction accessing the CSR - COMMIT_STAGE
     input logic [CVA6Cfg.VLEN-1:0] pc_i,
     // attempts to access a CSR without appropriate privilege - COMMIT_STAGE
@@ -364,6 +366,7 @@ module csr_regfile
   riscv::fcsr_t fcsr_q, fcsr_d;
   jvt_t jvt_q, jvt_d;
 
+  assign mojov_en_o = CVA6Cfg.MojoVEn && mojov_cfg_q.mojov_en;
   assign mojov_cfg_warl = {{CVA6Cfg.XLEN - 12{1'b0}}, mojov_cfg_q.mojov_ver, mojov_cfg_q.format_sel, mojov_cfg_q.key_valid, mojov_cfg_q.mojov_en};
   // ----------------
   // Assignments

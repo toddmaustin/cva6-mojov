@@ -50,6 +50,14 @@ module commit_stage
     output logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_o,
     // Floating point register enable - ISSUE_STAGE
     output logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_o,
+    // Zeroize Mojo-V GPR secret registers x24-x31 - ISSUE_STAGE
+    output logic mojov_gpr_zeroize_o,
+    // Zeroize Mojo-V FPR secret registers f24-f31 - ISSUE_STAGE
+    output logic mojov_fpr_zeroize_o,
+    // Mojo-V is currently architecturally enabled - CSR_REGFILE
+    input logic mojov_en_i,
+    // CSR address for the committing CSR instruction - CSR_REGFILE
+    input logic [11:0] csr_addr_i,
     // Result of AMO operation - CACHE
     input amo_resp_t amo_resp_i,
     // TO_BE_COMPLETED - FRONTEND_CSR_REGFILE
@@ -114,6 +122,7 @@ module commit_stage
   // Dirty the FP state if we are committing anything related to the FPU
   always_comb begin : dirty_fp_state
     dirty_fp_state_o = 1'b0;
+    dirty_fp_state_o |= CVA6Cfg.FpPresent && mojov_fpr_zeroize_o;
     for (int i = 0; i < CVA6Cfg.NrCommitPorts; i++) begin
       dirty_fp_state_o |= commit_ack_o[i] & ((commit_instr_i[i].fu inside {FPU, FPU_VEC} & CVA6Cfg.FpPresent & ariane_pkg::fd_changes_rd_state(
           commit_instr_i[i].op
@@ -127,8 +136,37 @@ module commit_stage
   assign commit_tran_id_o = commit_instr_i[0].trans_id;
 
   logic instr_0_is_amo;
+  logic mojov_disable_zeroize_q, mojov_disable_zeroize_d;
+  logic mojov_disable_zeroize_req;
+  logic mojov_cfg_write;
+  logic mojov_cfg_next_en;
   logic [CVA6Cfg.NrCommitPorts-1:0] commit_macro_ack;
   assign instr_0_is_amo = is_amo(commit_instr_i[0].op);
+
+  // commit_instr_i[0].result contains the CSR source operand, not the value that
+  // will be written.  Reproduce the CSR operation for mojov_en so CSRRC[I]
+  // disabling writes are recognized and CSRRS[I] writes are not mistaken for
+  // disables.
+  always_comb begin : mojov_cfg_next_enable
+    mojov_cfg_write   = 1'b1;
+    mojov_cfg_next_en = csr_rdata_i[0];
+    unique case (commit_instr_i[0].op)
+      CSR_WRITE: mojov_cfg_next_en = commit_instr_i[0].result[0];
+      CSR_SET:   mojov_cfg_next_en = csr_rdata_i[0] | commit_instr_i[0].result[0];
+      CSR_CLEAR: mojov_cfg_next_en = csr_rdata_i[0] & ~commit_instr_i[0].result[0];
+      default: begin
+        mojov_cfg_write = 1'b0;
+      end
+    endcase
+  end
+
+  assign mojov_disable_zeroize_req = CVA6Cfg.MojoVEn && mojov_en_i && commit_instr_i[0].valid &&
+                                     !commit_drop_i[0] && !commit_instr_i[0].ex.valid &&
+                                     !csr_exception_i.valid && !break_from_trigger_i && !halt_i &&
+                                     commit_instr_i[0].fu == CSR &&
+                                     csr_addr_i == riscv::CSR_MOJOV_CFG &&
+                                     mojov_cfg_write && !mojov_cfg_next_en &&
+                                     !mojov_disable_zeroize_q;
   // -------------------
   // Commit Instruction
   // -------------------
@@ -155,9 +193,19 @@ module commit_stage
     hfence_gvma_o = 1'b0;
     csr_write_fflags_o = 1'b0;
     flush_commit_o = 1'b0;
+    mojov_gpr_zeroize_o = 1'b0;
+    mojov_fpr_zeroize_o = 1'b0;
+    mojov_disable_zeroize_d = 1'b0;
 
-    // we do not commit the instruction yet if we requested a halt
-    if (commit_instr_i[0].valid && !halt_i) begin
+    if (mojov_disable_zeroize_req) begin
+      // Serialize the disabling CSR write: flush/block younger work and perform the
+      // architectural register scrub before allowing the CSR write to retire.
+      flush_commit_o = 1'b1;
+      mojov_gpr_zeroize_o = 1'b1;
+      mojov_fpr_zeroize_o = 1'b1;
+      mojov_disable_zeroize_d = 1'b1;
+    end else if (commit_instr_i[0].valid && !halt_i) begin
+      // We do not commit the instruction yet if we requested a halt.
       // we will not commit the instruction if we took an exception
       if (commit_instr_i[0].ex.valid || break_from_trigger_i) begin
         // However we can drop it (with its exception)
@@ -358,7 +406,25 @@ module commit_stage
         commit_macro_ack_o[i] = commit_instr_i[i].is_macro_instr ? commit_macro_ack[i] : commit_ack_o[i];
       end
     end else commit_macro_ack_o = commit_ack_o;
+    if (mojov_gpr_zeroize_o || mojov_fpr_zeroize_o) begin
+      commit_ack_o = '{default: 1'b0};
+      commit_macro_ack_o = '{default: 1'b0};
+      we_gpr_o = '{default: 1'b0};
+      we_fpr_o = '{default: 1'b0};
+    end
   end
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin : mojov_zeroize_state
+    if (!rst_ni) begin
+      mojov_disable_zeroize_q <= 1'b0;
+    end else begin
+      mojov_disable_zeroize_q <= mojov_disable_zeroize_d;
+    end
+  end
+
+  mojov_no_retire_during_zeroize :
+  assert property (@(posedge clk_i) disable iff (!rst_ni) (mojov_gpr_zeroize_o || mojov_fpr_zeroize_o) |-> !(|commit_ack_o))
+  else $fatal(1, "[Mojo-V] Instruction retired during zeroization");
 
   // -----------------------------
   // Exception & Interrupt Logic

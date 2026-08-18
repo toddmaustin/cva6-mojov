@@ -43,7 +43,9 @@ module ariane_regfile_fpga #(
     // write port
     input  logic [CVA6Cfg.NrCommitPorts-1:0][           4:0] waddr_i,
     input  logic [CVA6Cfg.NrCommitPorts-1:0][DATA_WIDTH-1:0] wdata_i,
-    input  logic [CVA6Cfg.NrCommitPorts-1:0]                 we_i
+    input  logic [CVA6Cfg.NrCommitPorts-1:0]                 we_i,
+    // Synchronously zero architectural secret registers x24-x31/f24-f31.
+    input  logic                                             mojov_zeroize_i
 );
 
   localparam ADDR_WIDTH = 5;
@@ -83,7 +85,9 @@ module ariane_regfile_fpga #(
     mem_block_sel = mem_block_sel_q;
     for (int i = 0; i < NUM_WORDS; i++) begin
       for (int j = 0; j < CVA6Cfg.NrCommitPorts; j++) begin
-        if (we_dec[j][i] == 1'b1) begin
+        if (mojov_zeroize_i && i inside {[24:31]}) begin
+          mem_block_sel[i] = '0;
+        end else if (we_dec[j][i] == 1'b1) begin
           mem_block_sel[i] = LOG_NR_WRITE_PORTS'(j);
         end
       end
@@ -107,7 +111,11 @@ module ariane_regfile_fpga #(
   logic [NR_READ_PORTS-1:0][DATA_WIDTH-1:0] mem_read_sync[CVA6Cfg.NrCommitPorts];
   for (genvar j = 0; j < CVA6Cfg.NrCommitPorts; j++) begin : regfile_ram_block
     always_ff @(posedge clk_i) begin
-      if (we_i[j] && ~waddr_i[j] != 0) begin
+      if (mojov_zeroize_i) begin
+        for (int i = 24; i < 32; i++) begin
+          mem[j][i] <= '0;
+        end
+      end else if (we_i[j] && ~waddr_i[j] != 0) begin
         mem[j][waddr_i[j]] <= wdata_i[j];
         if (CVA6Cfg.FpgaAlteraEn)
           wdata_reg[j] <= wdata_i[j];  // register data written in case is needed to read next cycle
@@ -134,6 +142,11 @@ module ariane_regfile_fpga #(
   for (genvar k = 0; k < NR_READ_PORTS; k++) begin : regfile_read_port
     assign block_addr[k] = mem_block_sel_q[raddr[k]];
     assign rdata_o[k] = (ZERO_REG_ZERO && raddr[k] == '0) ? '0 : mem_read[block_addr[k]][k];
+  end
+
+  for (genvar i = 24; i < 32; i++) begin : gen_mojov_zeroize_assert
+    assert property (@(posedge clk_i) disable iff (!rst_ni) mojov_zeroize_i |=> mem[0][i] == '0)
+    else $fatal(1, "[Mojo-V] Secret register was not zeroized");
   end
 
   // random initialization of the memory to suppress assert warnings on Questa.
