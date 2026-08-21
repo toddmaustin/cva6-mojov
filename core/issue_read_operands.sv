@@ -131,6 +131,8 @@ module issue_read_operands
     input logic mojov_gpr_zeroize_i,
     // Zeroize Mojo-V FPR secret registers f24-f31 - COMMIT_STAGE
     input logic mojov_fpr_zeroize_i,
+    // Committed Mojo-V architectural mode - CSR_REGFILE
+    input logic mojov_en_i,
     // Issue stall - PERF_COUNTERS
     output logic stall_issue_o,
     // Information dedicated to RVFI - RVFI
@@ -285,8 +287,17 @@ module issue_read_operands
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
     assign rs1_forwarding_o[i] = fu_data_n[i].operand_a[CVA6Cfg.VLEN-1:0];  //forwarding or unregistered rs1 value
     assign rs2_forwarding_o[i] = fu_data_n[i].operand_b[CVA6Cfg.VLEN-1:0];  //forwarding or unregistered rs2 value
-    assign rvfi_rs1_o[i] = fu_data_n[i].operand_a;
-    assign rvfi_rs2_o[i] = fu_data_n[i].operand_b;
+    // RVFI/debug plumbing must not make architectural secrets observable.
+    assign rvfi_rs1_o[i] = fu_data_n[i].mojov_secret_rs1 ? '0 : fu_data_n[i].operand_a;
+    assign rvfi_rs2_o[i] = fu_data_n[i].mojov_secret_rs2 ? '0 : fu_data_n[i].operand_b;
+    mojov_rvfi_secret_rs1_redacted:
+    assert property (@(posedge clk_i) disable iff (!rst_ni)
+      fu_data_n[i].mojov_secret_rs1 |-> rvfi_rs1_o[i] == '0)
+    else $fatal(1, "[Mojo-V] secret rs1 exposed to RVFI/debug plumbing");
+    mojov_rvfi_secret_rs2_redacted:
+    assert property (@(posedge clk_i) disable iff (!rst_ni)
+      fu_data_n[i].mojov_secret_rs2 |-> rvfi_rs2_o[i] == '0)
+    else $fatal(1, "[Mojo-V] secret rs2 exposed to RVFI/debug plumbing");
   end
 
   assign alu_bypass_o = alu_bypass_q;
@@ -701,6 +712,10 @@ module issue_read_operands
       fu_data_n[i].trans_id  = issue_instr_i[i].trans_id;
       fu_data_n[i].fu        = issue_instr_i[i].fu;
       fu_data_n[i].operation = issue_instr_i[i].op;
+      fu_data_n[i].mojov_secret_rs1 = mojov_secret_gpr(mojov_en_i, issue_instr_i[i].rs1);
+      fu_data_n[i].mojov_secret_rs2 = is_rs2_fpr(issue_instr_i[i].op) ?
+          mojov_secret_fpr(mojov_en_i, issue_instr_i[i].rs2) :
+          mojov_secret_gpr(mojov_en_i, issue_instr_i[i].rs2);
       if (CVA6Cfg.RVH) begin
         tinst_n[i] = issue_instr_i[i].ex.tinst;
       end

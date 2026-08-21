@@ -866,8 +866,22 @@ module load_store_unit
     fu_data_i.operation,
     fu_data_i.trans_id,
     speculative_load_i,
-    1'b0
+    1'b0,
+    fu_data_i.mojov_secret_rs1,
+    fu_data_i.mojov_secret_rs2
   };
+
+  mojov_no_plain_secret_address:
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+    lsu_valid_i && fu_data_i.mojov_secret_rs1 |->
+      (fu_data_i.operation inside {LDE, SDE, FLDE, FSDE}))
+  else $fatal(1, "[Mojo-V] ordinary memory operation consumed a secret address");
+
+  mojov_no_plain_secret_store_data:
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+    lsu_valid_i && fu_data_i.fu == STORE && fu_data_i.mojov_secret_rs2 |->
+      (fu_data_i.operation inside {SDE, FSDE}))
+  else $fatal(1, "[Mojo-V] ordinary store consumed secret data");
 
   lsu_bypass #(
       .CVA6Cfg(CVA6Cfg),

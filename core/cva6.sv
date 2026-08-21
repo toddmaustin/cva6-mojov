@@ -166,6 +166,8 @@ module cva6
       logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id;
       logic                             is_speculative_load;
       logic                             is_speculative_load_miss;
+      logic                             mojov_secret_addr;
+      logic                             mojov_secret_data;
     },
 
 
@@ -178,6 +180,8 @@ module cva6
       logic [CVA6Cfg.XLEN-1:0]          operand_b;
       logic [CVA6Cfg.XLEN-1:0]          imm;
       logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id;
+      logic                             mojov_secret_rs1;
+      logic                             mojov_secret_rs2;
     },
 
     localparam type icache_req_t = struct packed {
@@ -757,6 +761,7 @@ module cva6
       .irq_i               (irq_i),
       .irq_ctrl_i          (irq_ctrl_csr_id),
       .debug_mode_i        (debug_mode),
+      .mojov_en_i          (mojov_en_csr_commit),
       .tvm_i               (tvm_csr_id),
       .tw_i                (tw_csr_id),
       .vtw_i               (vtw_csr_id),
@@ -947,6 +952,7 @@ module cva6
       .we_fpr_i             (we_fpr_commit_id),
       .mojov_gpr_zeroize_i (mojov_gpr_zeroize_commit_id),
       .mojov_fpr_zeroize_i (mojov_fpr_zeroize_commit_id),
+      .mojov_en_i          (mojov_en_csr_commit),
       .commit_instr_o       (commit_instr_id_commit),
       .commit_drop_o        (commit_drop_id_commit),
       .commit_ack_i         (commit_ack_commit_id),

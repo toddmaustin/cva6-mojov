@@ -53,6 +53,16 @@ module branch_unit #(
   logic [CVA6Cfg.VLEN-1:0] target_address;
   logic [CVA6Cfg.VLEN-1:0] next_pc;
 
+  // Defense in depth: decode must enforce that no branch or jump consumes a
+  // secret operand.
+  mojov_no_secret_control_flow:
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+    branch_valid_i |->
+      !((ariane_pkg::op_is_branch(fu_data_i.operation) &&
+         (fu_data_i.mojov_secret_rs1 || fu_data_i.mojov_secret_rs2)) ||
+        (fu_data_i.operation == ariane_pkg::JALR && fu_data_i.mojov_secret_rs1)))
+  else $fatal(1, "[Mojo-V] branch or jump consumed a secret operand");
+
   // here we handle the various possibilities of mis-predicts
   always_comb begin : mispredict_handler
     // set the jump base, for JALR we need to look at the register, for all other control flow instructions we can take the current PC
