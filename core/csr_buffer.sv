@@ -39,6 +39,11 @@ module csr_buffer
     // CSR address to write - COMMIT_STAGE
     output logic [11:0] csr_addr_o
 );
+  mojov_no_secret_csr_operand:
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+    csr_valid_i && (fu_data_i.operation inside {CSR_WRITE, CSR_SET, CSR_CLEAR})
+      |-> !fu_data_i.mojov_secret_rs1)
+  else $fatal(1, "[Mojo-V] CSR operation consumed a secret GPR");
   // this is a single entry store buffer for the address of the CSR
   // which we are going to need in the commit stage
   struct packed {

@@ -158,6 +158,7 @@ module issue_stage
     input logic mojov_gpr_zeroize_i,
     // Zeroize Mojo-V FPR secret registers f24-f31 - COMMIT_STAGE
     input logic mojov_fpr_zeroize_i,
+    input logic mojov_en_i,
     // Instructions to commit - COMMIT_STAGE
     output scoreboard_entry_t [CVA6Cfg.NrCommitPorts-1:0] commit_instr_o,
     // Instruction is cancelled - COMMIT_STAGE
@@ -315,6 +316,7 @@ module issue_stage
       .we_fpr_i,
       .mojov_gpr_zeroize_i,
       .mojov_fpr_zeroize_i,
+      .mojov_en_i,
       .stall_issue_o,
       .rvfi_rs1_o              (rvfi_rs1_o),
       .rvfi_rs2_o              (rvfi_rs2_o),

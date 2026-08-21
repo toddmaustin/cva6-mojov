@@ -59,6 +59,18 @@ package ariane_pkg;
   // 32 registers
   localparam REG_ADDR_SIZE = 5;
 
+  // Mojo-V architectural secret register banks.  Keep these predicates as the
+  // single source of truth for decode, execution assertions, and observability.
+  function automatic logic mojov_secret_gpr(input logic mojov_en,
+                                              input logic [REG_ADDR_SIZE-1:0] regno);
+    return mojov_en && (regno inside {[5'd24:5'd31]});
+  endfunction
+
+  function automatic logic mojov_secret_fpr(input logic mojov_en,
+                                              input logic [REG_ADDR_SIZE-1:0] regno);
+    return mojov_en && (regno inside {[5'd24:5'd31]});
+  endfunction
+
   // Read ports for general purpose register files
   localparam NR_RGPR_PORTS = 2;
 

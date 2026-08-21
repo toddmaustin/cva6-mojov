@@ -89,6 +89,12 @@ module store_unit
     output dcache_req_i_t req_port_o
 );
 
+  mojov_no_plain_secret_store:
+  assert property (@(posedge clk_i) disable iff (!rst_ni)
+    valid_i && lsu_ctrl_i.mojov_secret_data |->
+      (lsu_ctrl_i.operation inside {SDE, FSDE}))
+  else $fatal(1, "[Mojo-V] secret data reached an ordinary store");
+
   // align data to address e.g.: shift data to be naturally 64
   function automatic [CVA6Cfg.XLEN-1:0] data_align(logic [2:0] addr, logic [63:0] data);
     // Set addr[2] to 1'b0 when 32bits

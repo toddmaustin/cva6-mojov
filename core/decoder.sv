@@ -66,6 +66,8 @@ module decoder
     input logic v_i,
     // Is debug mode - CSR_REGFILE
     input logic debug_mode_i,
+    // Committed Mojo-V architectural mode - CSR_REGFILE
+    input logic mojov_en_i,
     // Floating point extension status - CSR_REGFILE
     input riscv::xs_t fs_i,
     // Virtual floating point extension status - CSR_REGFILE
@@ -1294,7 +1296,7 @@ module decoder
               imm_select        = IIMM;
               instruction_o.rs1 = instr.itype.rs1;
               instruction_o.rd  = instr.itype.rd;
-              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::LDE;
+              if (CVA6Cfg.MojoVEn && mojov_en_i) instruction_o.op = ariane_pkg::LDE;
               else illegal_instr = 1'b1;
             end
             32'b?????????????????001?????0001011: begin
@@ -1302,7 +1304,7 @@ module decoder
               imm_select        = SIMM;
               instruction_o.rs1 = instr.stype.rs1;
               instruction_o.rs2 = instr.stype.rs2;
-              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::SDE;
+              if (CVA6Cfg.MojoVEn && mojov_en_i) instruction_o.op = ariane_pkg::SDE;
               else illegal_instr = 1'b1;
             end
             32'b?????????????????010?????0001011: begin
@@ -1310,7 +1312,7 @@ module decoder
               imm_select        = IIMM;
               instruction_o.rs1 = instr.itype.rs1;
               instruction_o.rd  = instr.itype.rd;
-              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::FLDE;
+              if (CVA6Cfg.MojoVEn && mojov_en_i) instruction_o.op = ariane_pkg::FLDE;
               else illegal_instr = 1'b1;
             end
             32'b?????????????????011?????0001011: begin
@@ -1318,7 +1320,7 @@ module decoder
               imm_select        = SIMM;
               instruction_o.rs1 = instr.stype.rs1;
               instruction_o.rs2 = instr.stype.rs2;
-              if (CVA6Cfg.MojoVEn) instruction_o.op = ariane_pkg::FSDE;
+              if (CVA6Cfg.MojoVEn && mojov_en_i) instruction_o.op = ariane_pkg::FSDE;
               else illegal_instr = 1'b1;
             end
             default: illegal_instr = 1'b1;
@@ -1790,6 +1792,41 @@ module decoder
         illegal_instr           = acc_illegal_instr;
         is_control_flow_instr_o = acc_is_control_flow_instr;
       end
+    end
+
+    // Mojo-V non-interference policy.  These checks intentionally use the
+    // committed CSR state, not the instruction currently changing that state.
+    if (CVA6Cfg.MojoVEn && mojov_en_i) begin
+      // No branch or jump consumes a secret operand.
+      if ((op_is_branch(instruction_o.op) &&
+           (mojov_secret_gpr(mojov_en_i, instruction_o.rs1) ||
+            mojov_secret_gpr(mojov_en_i, instruction_o.rs2))) ||
+          (instruction_o.op == JALR &&
+           mojov_secret_gpr(mojov_en_i, instruction_o.rs1)))
+        illegal_instr = 1'b1;
+
+      // Only encrypted Mojo-V memory operations may form an address from a
+      // secret base register.
+      if ((instruction_o.fu inside {LOAD, STORE}) &&
+          !(instruction_o.op inside {LDE, SDE, FLDE, FSDE}) &&
+          mojov_secret_gpr(mojov_en_i, instruction_o.rs1))
+        illegal_instr = 1'b1;
+
+      // Ordinary stores must never disclose a secret store-data operand.
+      if (instruction_o.fu == STORE && instruction_o.op != SDE &&
+          !is_rs2_fpr(instruction_o.op) &&
+          mojov_secret_gpr(mojov_en_i, instruction_o.rs2))
+        illegal_instr = 1'b1;
+      if (instruction_o.fu == STORE && instruction_o.op != FSDE &&
+          is_rs2_fpr(instruction_o.op) &&
+          mojov_secret_fpr(mojov_en_i, instruction_o.rs2))
+        illegal_instr = 1'b1;
+
+      // Immediate CSR forms do not consume rs1; register write/set/clear do.
+      if ((instruction_o.op inside {CSR_WRITE, CSR_SET, CSR_CLEAR}) &&
+          !instruction_o.use_zimm &&
+          mojov_secret_gpr(mojov_en_i, instruction_o.rs1))
+        illegal_instr = 1'b1;
     end
   end
 

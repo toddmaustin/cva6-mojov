@@ -73,6 +73,8 @@ module id_stage #(
     input irq_ctrl_t irq_ctrl_i,
     // Is current mode debug ? - CSR_REGFILE
     input logic debug_mode_i,
+    // Committed Mojo-V architectural mode - CSR_REGFILE
+    input logic mojov_en_i,
     // Trap virtual memory - CSR_REGFILE
     input logic tvm_i,
     // Timeout wait - CSR_REGFILE
@@ -344,6 +346,7 @@ module id_stage #(
         .priv_lvl_i                (priv_lvl_i),
         .v_i                       (v_i),
         .debug_mode_i              (debug_mode_i),
+        .mojov_en_i,
         .fs_i,
         .vfs_i,
         .frm_i,

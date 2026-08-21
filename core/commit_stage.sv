@@ -426,6 +426,52 @@ module commit_stage
   assert property (@(posedge clk_i) disable iff (!rst_ni) (mojov_gpr_zeroize_o || mojov_fpr_zeroize_o) |-> !(|commit_ack_o))
   else $fatal(1, "[Mojo-V] Instruction retired during zeroization");
 
+  for (genvar i = 0; i < CVA6Cfg.NrCommitPorts; i++) begin : gen_mojov_commit_assert
+    logic mojov_secret_control_flow;
+    logic mojov_secret_plain_address;
+    logic mojov_secret_plain_store_data;
+    logic mojov_secret_csr_operand;
+
+    // Conditional branches may not compare secret GPRs, and JALR may not use
+    // a secret GPR as its indirect target base.
+    assign mojov_secret_control_flow =
+        (op_is_branch(commit_instr_i[i].op) &&
+         (mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs1) ||
+          mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs2))) ||
+        (commit_instr_i[i].op == JALR &&
+         mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs1));
+
+    // An ordinary load or store may not form its address from a secret GPR;
+    // the encrypted Mojo-V memory operations are the only permitted cases.
+    assign mojov_secret_plain_address =
+        (commit_instr_i[i].fu inside {LOAD, STORE}) &&
+        !(commit_instr_i[i].op inside {LDE, SDE, FLDE, FSDE}) &&
+        mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs1);
+
+    // Ordinary integer and FP stores may not disclose secret store data.  SDE
+    // and FSDE are respectively the permitted encrypted GPR and FPR stores.
+    assign mojov_secret_plain_store_data =
+        commit_instr_i[i].fu == STORE &&
+        !(commit_instr_i[i].op inside {SDE, FSDE}) &&
+        (is_rs2_fpr(commit_instr_i[i].op) ?
+          mojov_secret_fpr(mojov_en_i, commit_instr_i[i].rs2) :
+          mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs2));
+
+    // Register-based CSR write, set, and clear operations may not consume a
+    // secret GPR.  Immediate CSR forms do not read the encoded rs1 register.
+    assign mojov_secret_csr_operand =
+        (commit_instr_i[i].op inside {CSR_WRITE, CSR_SET, CSR_CLEAR}) &&
+        !commit_instr_i[i].use_zimm &&
+        mojov_secret_gpr(mojov_en_i, commit_instr_i[i].rs1);
+
+    mojov_no_illegal_secret_retire:
+    assert property (@(posedge clk_i) disable iff (!rst_ni)
+      commit_ack_o[i] && commit_instr_i[i].valid && mojov_en_i |->
+        !(mojov_secret_control_flow || mojov_secret_plain_address ||
+          mojov_secret_plain_store_data || mojov_secret_csr_operand))
+    else $fatal(1, "[Mojo-V] forbidden secret operand reached commit");
+  end
+
   // -----------------------------
   // Exception & Interrupt Logic
   // -----------------------------
